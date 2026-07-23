@@ -19,7 +19,7 @@
     * { box-sizing: border-box; }
     html { background: var(--canvas); }
     body { margin: 0; background: var(--canvas); color: var(--ink); font-family: Arial, Helvetica, sans-serif; }
-    button, input, textarea { font: inherit; }
+    button, input, textarea, select { font: inherit; }
     button { color: inherit; cursor: pointer; }
     .topbar {
       position: sticky; top: 0; z-index: 20; height: 72px; padding: 0 4vw;
@@ -90,7 +90,15 @@
     .status { width: 24px; height: 24px; display: grid; place-items: center; border: 1px solid #c8cec9; border-radius: 50%; }
     .status.done { border-color: var(--green); background: var(--green); color: white; }
     .title-cell strong, .title-cell small { display: block; }
-    .title-cell strong { font-size: 12px; } .title-cell small { margin-top: 5px; color: var(--muted); font-size: 9px; text-transform: uppercase; }
+    .stream-heading { display: flex; align-items: center; gap: 8px; }
+    .title-cell strong { font-size: 12px; }
+    .priority { flex: none; min-width: 28px; padding: 3px 6px; border-radius: 999px; font-size: 9px; font-style: normal; font-weight: 850; line-height: 1; text-align: center; }
+    .priority.p1 { background: #fee5df; color: #b23422; }
+    .priority.p2 { background: #ffead7; color: #a04d00; }
+    .priority.p3 { background: #f7efce; color: #775f00; }
+    .priority.p4 { background: #dfeee6; color: var(--green); }
+    .priority.p5 { background: #e8ebe8; color: var(--muted); }
+    .title-cell small { margin-top: 5px; color: var(--muted); font-size: 9px; text-transform: uppercase; }
     .late .title-cell small, .late-date { color: var(--accent); }
     .row time { font-size: 11px; }
     .progress { display: flex; align-items: center; gap: 9px; }
@@ -111,9 +119,9 @@
     form { padding: 25px 28px 28px; }
     label { display: block; margin-bottom: 18px; }
     label span { display: flex; justify-content: space-between; margin-bottom: 7px; color: #4b554f; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
-    input, textarea { width: 100%; border: 1px solid #d5dbd5; border-radius: 5px; background: #fafbf9; outline: 0; }
-    input { height: 43px; padding: 0 11px; } textarea { min-height: 94px; padding: 11px; resize: vertical; }
-    input:focus, textarea:focus { border-color: var(--ink); box-shadow: 0 0 0 3px rgba(20,32,27,.08); }
+    input, textarea, select { width: 100%; border: 1px solid #d5dbd5; border-radius: 5px; background: #fafbf9; outline: 0; }
+    input, select { height: 43px; padding: 0 11px; } textarea { min-height: 94px; padding: 11px; resize: vertical; }
+    input:focus, textarea:focus, select:focus { border-color: var(--ink); box-shadow: 0 0 0 3px rgba(20,32,27,.08); }
     input[type=range] { height: auto; padding: 0; }
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
     .form-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 25px; padding-top: 18px; border-top: 1px solid var(--line); }
@@ -239,6 +247,7 @@
           <label><span>Owner</span><input id="owner" required placeholder="Nom et prénom"></label>
           <label><span>Date limite</span><input id="dueDate" type="date" required></label>
         </div>
+        <label><span>Priorité — P1 est la plus élevée</span><select id="priority" required><option value="1">P1 — Critique</option><option value="2">P2 — Haute</option><option value="3" selected>P3 — Normale</option><option value="4">P4 — Basse</option><option value="5">P5 — Très basse</option></select></label>
         <label><span>Avancement <b id="progressLabel">0%</b></span><input id="progress" type="range" min="0" max="100" step="5" value="0"></label>
         <label><span>Prompt de travail pour ChatGPT</span><textarea id="prompt" placeholder="Ex. Analyse les blocages et transforme-les en plan d’action…"></textarea></label>
         <div class="form-foot">
@@ -282,6 +291,7 @@
       owner: row.owner,
       dueDate: row.due_date,
       progress: Number(row.progress),
+      priority: Number(row.priority ?? 3),
       prompt: row.prompt || ""
     });
     function setSync(busy=false, label="Synchronisé") {
@@ -360,7 +370,7 @@
     }
     async function saveStream(data) {
       setSync(true,"Enregistrement…");
-      const body={title:data.title,owner:data.owner,due_date:data.dueDate,progress:data.progress,prompt:data.prompt,updated_at:new Date().toISOString()};
+      const body={title:data.title,owner:data.owner,due_date:data.dueDate,progress:data.progress,priority:data.priority,prompt:data.prompt,updated_at:new Date().toISOString()};
       const endpoint=editingId ? `/rest/v1/streams?id=eq.${editingId}` : "/rest/v1/streams";
       const response=await fetch(SUPABASE_URL+endpoint,{
         method:editingId?"PATCH":"POST", headers:apiHeaders({Prefer:"return=representation"}), body:JSON.stringify(body)
@@ -373,7 +383,7 @@
       await parseResponse(response); await loadStreams(true); setSync(false,"Synchronisé");
     }
     function promptFor(s) {
-      return [`Je travaille sur le workstream « ${s.title} ».`,`Owner : ${s.owner}.`,`Échéance : ${formatDate(s.dueDate)}.`,`Avancement actuel : ${s.progress} %.`,"",s.prompt || "Aide-moi à identifier les prochaines actions concrètes et à structurer un plan d’exécution.","","Commence par me poser uniquement les questions indispensables, puis propose les trois prochaines actions prioritaires."].join("\n");
+      return [`Je travaille sur le workstream « ${s.title} ».`,`Owner : ${s.owner}.`,`Priorité : P${s.priority} (P1 est la plus élevée).`,`Échéance : ${formatDate(s.dueDate)}.`,`Avancement actuel : ${s.progress} %.`,"",s.prompt || "Aide-moi à identifier les prochaines actions concrètes et à structurer un plan d’exécution.","","Commence par me poser uniquement les questions indispensables, puis propose les trois prochaines actions prioritaires."].join("\n");
     }
     function openChat(id) {
       const s = streams.find(x => x.id === id), prompt = promptFor(s);
@@ -382,7 +392,7 @@
     }
     function render() {
       const query = $("search").value.trim().toLowerCase();
-      const overdue = streams.filter(late).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
+      const overdue = streams.filter(late).sort((a,b)=>a.priority-b.priority || a.dueDate.localeCompare(b.dueDate));
       const active = streams.filter(s=>s.progress<100).length, done = streams.length-active;
       const avg = streams.length ? Math.round(streams.reduce((n,s)=>n+s.progress,0)/streams.length) : 0;
       $("average").textContent = avg+"%"; $("averageBar").style.width = avg+"%";
@@ -403,9 +413,9 @@
         if (activeFilter==="active" && s.progress===100) return false;
         if (activeFilter==="done" && s.progress<100) return false;
         return !query || `${s.title} ${s.owner}`.toLowerCase().includes(query);
-      }).sort((a,b)=>Number(late(b))-Number(late(a)) || Number(a.progress===100)-Number(b.progress===100) || a.dueDate.localeCompare(b.dueDate));
+      }).sort((a,b)=>Number(a.progress===100)-Number(b.progress===100) || a.priority-b.priority || Number(late(b))-Number(late(a)) || a.dueDate.localeCompare(b.dueDate));
       $("rows").innerHTML = visible.length ? visible.map(s=>`<article class="row ${late(s)?"late":""}">
-        <button class="title-cell" data-edit="${s.id}"><i class="status ${s.progress===100?"done":""}">${s.progress===100?"✓":""}</i><span><strong>${esc(s.title)}</strong><small>${s.progress===100?"Terminé":late(s)?`En retard de ${lateDays(s.dueDate)} j`:"En cours"}</small></span></button>
+        <button class="title-cell" data-edit="${s.id}"><i class="status ${s.progress===100?"done":""}">${s.progress===100?"✓":""}</i><span><span class="stream-heading"><strong>${esc(s.title)}</strong><i class="priority p${s.priority}">P${s.priority}</i></span><small>${s.progress===100?"Terminé":late(s)?`En retard de ${lateDays(s.dueDate)} j`:"En cours"}</small></span></button>
         <div class="person"><span class="avatar">${esc(initials(s.owner))}</span><span>${esc(s.owner)}</span></div>
         <time class="${late(s)?"late-date":""}">${formatDate(s.dueDate)}</time>
         <div class="progress"><div class="track"><i style="width:${s.progress}%"></i></div><strong>${s.progress}%</strong></div>
@@ -418,6 +428,7 @@
       $("modalTitle").textContent = stream ? "Modifier le stream" : "Créer un stream";
       $("title").value = stream?.title || ""; $("owner").value = stream?.owner || "";
       $("dueDate").value = stream?.dueDate || new Date(Date.now()+7*86400000).toISOString().slice(0,10);
+      $("priority").value = stream?.priority || 3;
       $("progress").value = stream?.progress || 0; $("progressLabel").textContent = `${stream?.progress || 0}%`;
       $("prompt").value = stream?.prompt || ""; $("deleteButton").hidden = !stream;
       $("modalWrap").classList.add("open"); $("title").focus();
@@ -438,7 +449,7 @@
     });
     $("streamForm").onsubmit = async e => {
       e.preventDefault();
-      const data={title:$("title").value.trim(),owner:$("owner").value.trim(),dueDate:$("dueDate").value,progress:Number($("progress").value),prompt:$("prompt").value.trim()};
+      const data={title:$("title").value.trim(),owner:$("owner").value.trim(),dueDate:$("dueDate").value,progress:Number($("progress").value),priority:Number($("priority").value),prompt:$("prompt").value.trim()};
       const submit=e.submitter; if(submit) submit.disabled=true;
       try { await saveStream(data); closeModal(); notify("Stream enregistré et synchronisé."); }
       catch(error) { notify(error.message,true); setSync(true,"Erreur de synchronisation"); }

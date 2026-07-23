@@ -3,32 +3,37 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Tableau de pilotage des workstreams" />
-  <title>Streamline — Workstream Tracker</title>
+  <meta name="description" content="Tableau de pilotage Café Détours" />
+  <title>Café Détours — Pilotage</title>
   <style>
     :root {
-      --ink: #14201b;
-      --muted: #6c746f;
-      --line: #dfe4df;
-      --canvas: #f4f5f1;
-      --paper: #fff;
-      --accent: #ff5a36;
-      --green: #1b6a4c;
-      --yellow: #f3c84b;
+      --ink: #18324d;
+      --muted: #6d7480;
+      --line: #d8d1c4;
+      --canvas: #f3eee3;
+      --paper: #fffaf0;
+      --accent: #b8533f;
+      --green: #315f78;
+      --yellow: #c49a46;
     }
     * { box-sizing: border-box; }
     html { background: var(--canvas); }
     body { margin: 0; background: var(--canvas); color: var(--ink); font-family: Arial, Helvetica, sans-serif; }
     button, input, textarea, select { font: inherit; }
     button { color: inherit; cursor: pointer; }
+    h1, h2, h3, .score strong, .metric strong { font-family: Georgia, "Times New Roman", serif; font-weight: 500; }
     .topbar {
       position: sticky; top: 0; z-index: 20; height: 72px; padding: 0 4vw;
       display: flex; align-items: center; justify-content: space-between;
-      background: rgba(244,245,241,.95); border-bottom: 1px solid var(--line);
+      background: rgba(243,238,227,.95); border-bottom: 1px solid var(--line);
       backdrop-filter: blur(14px);
     }
-    .brand { display: flex; align-items: center; gap: 11px; font-size: 19px; font-weight: 800; letter-spacing: -.04em; }
-    .mark { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; background: var(--ink); color: white; font-size: 14px; }
+    .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); }
+    .mark { width: 43px; height: 35px; display: grid; place-items: center; color: var(--ink); }
+    .rabbit-logo { width: 100%; height: 100%; overflow: visible; stroke: currentColor; stroke-width: 1.65; stroke-linecap: round; stroke-linejoin: round; }
+    .brand-name { display: flex; flex-direction: column; line-height: .82; }
+    .brand-name small { margin: 0 0 4px 2px; font-size: 7px; font-weight: 800; letter-spacing: .24em; }
+    .brand-name strong { font-family: Georgia, "Times New Roman", serif; font-size: 19px; font-weight: 600; letter-spacing: -.03em; }
     .top-actions { display: flex; align-items: center; gap: 10px; }
     .account { max-width: 240px; color: var(--muted); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .sync { display: flex; align-items: center; gap: 6px; color: var(--green); font-size: 10px; font-weight: 750; }
@@ -36,7 +41,7 @@
     .sync.busy { color: #a57800; }
     .signout { height: 34px; padding: 0 10px; border: 1px solid #ccd2cd; border-radius: 6px; background: transparent; color: var(--muted); font-size: 10px; font-weight: 750; }
     .button { height: 42px; padding: 0 16px; border: 0; border-radius: 7px; background: var(--ink); color: white; font-size: 12px; font-weight: 750; }
-    .button:hover { background: #26342e; }
+    .button:hover { background: #274865; }
     .workspace { width: min(1400px, 92vw); margin: auto; padding: 54px 0 86px; }
     .intro { display: grid; grid-template-columns: 1fr 260px; gap: 48px; align-items: end; }
     .eyebrow { margin: 0 0 13px; color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .16em; }
@@ -130,7 +135,7 @@
     .secondary { background: #ecefeb; } .delete { padding-left: 0; background: none; color: #b23422; }
     .auth-wrap { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px; background: var(--canvas); }
     .auth-wrap[hidden] { display: none; }
-    .auth-card { width: min(460px,100%); padding: 38px; border-top: 4px solid var(--ink); background: white; box-shadow: 0 18px 50px rgba(20,32,27,.11); }
+    .auth-card { width: min(460px,100%); padding: 38px; border-top: 4px solid var(--ink); background: var(--paper); box-shadow: 0 18px 50px rgba(24,50,77,.13); }
     .auth-brand { margin-bottom: 34px; }
     .auth-card h2 { margin: 0; font-size: 36px; letter-spacing: -.055em; }
     .auth-card p { margin: 13px 0 24px; color: var(--muted); font-size: 13px; line-height: 1.55; }
@@ -176,9 +181,9 @@
 <body>
   <div class="auth-wrap" id="authWrap">
     <section class="auth-card">
-      <div class="brand auth-brand"><span class="mark">S</span>Streamline</div>
+      <div class="brand auth-brand"><span class="mark" aria-hidden="true"><svg class="rabbit-logo" viewBox="0 0 64 52" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M33 27c-3-5-9-7-15-5-6 2-9 7-9 12 0 7 6 11 14 11h17c9 0 16-5 16-12 0-6-5-11-13-11-4 0-8 1-11 4"/><path d="M19 22C15 15 13 7 17 5c4-2 7 8 8 16M26 21c0-8 2-17 6-17 4 1 3 11-1 19"/><circle cx="17" cy="29" r="1.4" fill="currentColor" stroke="none"/><path d="M10 35H5m27 10-3 4m17-5 4 4"/><circle cx="56" cy="27" r="5"/></svg></span><span class="brand-name"><small>CAFÉ</small><strong>DÉTOURS</strong></span></div>
       <p class="eyebrow" id="authKicker">CONNEXION SÉCURISÉE</p>
-      <h2 id="authTitle">Retrouvez vos streams.</h2>
+      <h2 id="authTitle">Pilotez Café Détours.</h2>
       <p id="authIntro">Connectez-vous avec la même adresse sur tous vos appareils pour synchroniser automatiquement vos données.</p>
       <form id="authForm">
         <label><span>Adresse e-mail</span><input id="authEmail" type="email" autocomplete="email" required placeholder="vous@entreprise.com"></label>
@@ -190,7 +195,7 @@
     </section>
   </div>
   <header class="topbar">
-    <div class="brand"><span class="mark">S</span>Streamline</div>
+    <div class="brand"><span class="mark" aria-hidden="true"><svg class="rabbit-logo" viewBox="0 0 64 52" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M33 27c-3-5-9-7-15-5-6 2-9 7-9 12 0 7 6 11 14 11h17c9 0 16-5 16-12 0-6-5-11-13-11-4 0-8 1-11 4"/><path d="M19 22C15 15 13 7 17 5c4-2 7 8 8 16M26 21c0-8 2-17 6-17 4 1 3 11-1 19"/><circle cx="17" cy="29" r="1.4" fill="currentColor" stroke="none"/><path d="M10 35H5m27 10-3 4m17-5 4 4"/><circle cx="56" cy="27" r="5"/></svg></span><span class="brand-name"><small>CAFÉ</small><strong>DÉTOURS</strong></span></div>
     <div class="top-actions">
       <span class="sync" id="syncState">Synchronisé</span>
       <span class="account" id="accountEmail"></span>
@@ -201,9 +206,9 @@
   <main class="workspace">
     <section class="intro">
       <div>
-        <p class="eyebrow">WORKSTREAM COMMAND CENTER</p>
+        <p class="eyebrow">PILOTAGE CAFÉ DÉTOURS</p>
         <h1>Ce qui avance.<br>Ce qui bloque.</h1>
-        <p class="lead">Une vue unique pour maintenir les priorités, les responsables et les échéances alignés.</p>
+        <p class="lead">Le tableau de bord opérationnel pour aligner les priorités, les responsables et les échéances de Café Détours.</p>
       </div>
       <div class="score">
         <span>Avancement global</span><strong id="average">0%</strong>
@@ -515,3 +520,4 @@
   </script>
 </body>
 </html>
+

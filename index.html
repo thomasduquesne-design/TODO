@@ -29,6 +29,12 @@
     }
     .brand { display: flex; align-items: center; gap: 11px; font-size: 19px; font-weight: 800; letter-spacing: -.04em; }
     .mark { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; background: var(--ink); color: white; font-size: 14px; }
+    .top-actions { display: flex; align-items: center; gap: 10px; }
+    .account { max-width: 240px; color: var(--muted); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sync { display: flex; align-items: center; gap: 6px; color: var(--green); font-size: 10px; font-weight: 750; }
+    .sync::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+    .sync.busy { color: #a57800; }
+    .signout { height: 34px; padding: 0 10px; border: 1px solid #ccd2cd; border-radius: 6px; background: transparent; color: var(--muted); font-size: 10px; font-weight: 750; }
     .button { height: 42px; padding: 0 16px; border: 0; border-radius: 7px; background: var(--ink); color: white; font-size: 12px; font-weight: 750; }
     .button:hover { background: #26342e; }
     .workspace { width: min(1400px, 92vw); margin: auto; padding: 54px 0 86px; }
@@ -114,6 +120,20 @@
     .form-foot div { display: flex; gap: 8px; }
     .secondary, .delete { height: 40px; padding: 0 14px; border: 0; border-radius: 6px; font-size: 11px; font-weight: 750; }
     .secondary { background: #ecefeb; } .delete { padding-left: 0; background: none; color: #b23422; }
+    .auth-wrap { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px; background: var(--canvas); }
+    .auth-wrap[hidden] { display: none; }
+    .auth-card { width: min(460px,100%); padding: 38px; border-top: 4px solid var(--ink); background: white; box-shadow: 0 18px 50px rgba(20,32,27,.11); }
+    .auth-brand { margin-bottom: 34px; }
+    .auth-card h2 { margin: 0; font-size: 36px; letter-spacing: -.055em; }
+    .auth-card p { margin: 13px 0 24px; color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .auth-card form { padding: 0; }
+    .auth-card .button { width: 100%; margin-top: 5px; }
+    .auth-switch { width: 100%; margin-top: 13px; border: 0; background: none; color: var(--green); font-size: 11px; font-weight: 750; }
+    .auth-message { min-height: 18px; margin: 15px 0 0 !important; font-size: 11px !important; }
+    .auth-message.error { color: #b23422; }
+    .toast { position: fixed; right: 22px; bottom: 22px; z-index: 120; max-width: 380px; padding: 14px 18px; border-radius: 7px; background: var(--ink); color: white; font-size: 11px; box-shadow: 0 12px 32px rgba(20,32,27,.2); }
+    .toast.error { background: #b23422; }
+    .toast[hidden] { display: none; }
     @media (max-width: 900px) {
       .head { display: none; }
       .row { grid-template-columns: 1.6fr 1fr; padding: 15px 0; }
@@ -123,6 +143,10 @@
     }
     @media (max-width: 700px) {
       .topbar { padding: 0 18px; }
+      .account, .sync { display: none; }
+      .signout { width: 34px; padding: 0; overflow: hidden; color: transparent; }
+      .signout::first-letter { color: var(--muted); }
+      .button#newButton { padding: 0 11px; }
       .workspace { width: calc(100% - 30px); padding-top: 36px; }
       .intro { grid-template-columns: 1fr; gap: 25px; }
       h1 { font-size: 50px; }
@@ -142,9 +166,29 @@
   </style>
 </head>
 <body>
+  <div class="auth-wrap" id="authWrap">
+    <section class="auth-card">
+      <div class="brand auth-brand"><span class="mark">S</span>Streamline</div>
+      <p class="eyebrow" id="authKicker">CONNEXION SÉCURISÉE</p>
+      <h2 id="authTitle">Retrouvez vos streams.</h2>
+      <p id="authIntro">Connectez-vous avec la même adresse sur tous vos appareils pour synchroniser automatiquement vos données.</p>
+      <form id="authForm">
+        <label><span>Adresse e-mail</span><input id="authEmail" type="email" autocomplete="email" required placeholder="vous@entreprise.com"></label>
+        <label><span>Mot de passe</span><input id="authPassword" type="password" autocomplete="current-password" minlength="8" required placeholder="8 caractères minimum"></label>
+        <button class="button" id="authSubmit" type="submit">Se connecter</button>
+        <button class="auth-switch" id="authSwitch" type="button">Première visite ? Créer mon accès</button>
+        <p class="auth-message" id="authMessage"></p>
+      </form>
+    </section>
+  </div>
   <header class="topbar">
     <div class="brand"><span class="mark">S</span>Streamline</div>
-    <button class="button" id="newButton">＋ Nouveau stream</button>
+    <div class="top-actions">
+      <span class="sync" id="syncState">Synchronisé</span>
+      <span class="account" id="accountEmail"></span>
+      <button class="signout" id="signoutButton" title="Se déconnecter">↪ Déconnexion</button>
+      <button class="button" id="newButton">＋ Nouveau stream</button>
+    </div>
   </header>
   <main class="workspace">
     <section class="intro">
@@ -204,11 +248,18 @@
       </form>
     </section>
   </div>
+  <div class="toast" id="toast" hidden></div>
   <script>
-    const STORAGE_KEY = "streamline-workstreams-v1";
-    let streams = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    const SUPABASE_URL = "https://vkfgjgnnkhcnunbqzwyt.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_f_b5rDKUgjNufFZxK0230Q_uA03A3aw";
+    const SESSION_KEY = "streamline-supabase-session-v1";
+    let session = JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
+    let streams = [];
     let editingId = null;
     let activeFilter = "all";
+    let signupMode = false;
+    let syncTimer = null;
+    let toastTimer = null;
     const $ = (id) => document.getElementById(id);
     const esc = (value) => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
     const today = () => {
@@ -219,7 +270,108 @@
     const initials = (name) => name.trim().split(/\s+/).slice(0,2).map(x => x[0]?.toUpperCase()).join("");
     const late = (s) => s.progress < 100 && s.dueDate < today();
     const lateDays = (date) => Math.max(1,Math.round((new Date(today()+"T12:00:00")-new Date(date+"T12:00:00"))/86400000));
-    const save = () => { localStorage.setItem(STORAGE_KEY,JSON.stringify(streams)); render(); };
+    const apiHeaders = (extra={}) => ({
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${session?.access_token || SUPABASE_KEY}`,
+      "Content-Type": "application/json",
+      ...extra
+    });
+    const toStream = row => ({
+      id: Number(row.id),
+      title: row.title,
+      owner: row.owner,
+      dueDate: row.due_date,
+      progress: Number(row.progress),
+      prompt: row.prompt || ""
+    });
+    function setSync(busy=false, label="Synchronisé") {
+      $("syncState").classList.toggle("busy",busy);
+      $("syncState").textContent = label;
+    }
+    function notify(message,error=false) {
+      clearTimeout(toastTimer);
+      $("toast").textContent=message; $("toast").className="toast"+(error?" error":""); $("toast").hidden=false;
+      toastTimer=setTimeout(()=>$("toast").hidden=true,4000);
+    }
+    async function parseResponse(response) {
+      const text = await response.text();
+      let data = null;
+      try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+      if (!response.ok) throw new Error(data?.msg || data?.message || data?.error_description || data?.error || `Erreur ${response.status}`);
+      return data;
+    }
+    function storeSession(data) {
+      if (!data?.access_token) return;
+      session = {
+        access_token:data.access_token,
+        refresh_token:data.refresh_token,
+        expires_at:Math.floor(Date.now()/1000)+Number(data.expires_in || 3600),
+        user:data.user || session?.user
+      };
+      localStorage.setItem(SESSION_KEY,JSON.stringify(session));
+    }
+    function captureSessionFromLink() {
+      const hash=new URLSearchParams(location.hash.replace(/^#/,""));
+      const accessToken=hash.get("access_token"), refreshToken=hash.get("refresh_token");
+      if (!accessToken || !refreshToken) return;
+      storeSession({
+        access_token:accessToken,
+        refresh_token:refreshToken,
+        expires_in:Number(hash.get("expires_in") || 3600)
+      });
+      history.replaceState({},document.title,location.pathname+location.search);
+    }
+    async function refreshSession() {
+      if (!session?.refresh_token) throw new Error("Session expirée");
+      const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`,{
+        method:"POST", headers:{apikey:SUPABASE_KEY,"Content-Type":"application/json"},
+        body:JSON.stringify({refresh_token:session.refresh_token})
+      });
+      storeSession(await parseResponse(response));
+    }
+    async function ensureSession() {
+      if (!session?.access_token) return false;
+      if (session.expires_at && session.expires_at < Math.floor(Date.now()/1000)+60) await refreshSession();
+      const response = await fetch(`${SUPABASE_URL}/auth/v1/user`,{headers:apiHeaders()});
+      if (!response.ok) {
+        try { await refreshSession(); } catch { clearSession(); return false; }
+      } else {
+        session.user=await response.json();
+        localStorage.setItem(SESSION_KEY,JSON.stringify(session));
+      }
+      return true;
+    }
+    function clearSession() {
+      session=null; streams=[]; localStorage.removeItem(SESSION_KEY);
+      clearInterval(syncTimer); syncTimer=null; render();
+    }
+    async function loadStreams(silent=false) {
+      if (!session) return;
+      if (!silent) setSync(true,"Synchronisation…");
+      try {
+        if (session.expires_at < Math.floor(Date.now()/1000)+60) await refreshSession();
+        const response=await fetch(`${SUPABASE_URL}/rest/v1/streams?select=*&order=due_date.asc`,{headers:apiHeaders()});
+        streams=(await parseResponse(response)).map(toStream);
+        render(); setSync(false,"Synchronisé");
+      } catch(error) {
+        setSync(true,"Hors connexion");
+        if (!silent) notify(error.message,true);
+      }
+    }
+    async function saveStream(data) {
+      setSync(true,"Enregistrement…");
+      const body={title:data.title,owner:data.owner,due_date:data.dueDate,progress:data.progress,prompt:data.prompt,updated_at:new Date().toISOString()};
+      const endpoint=editingId ? `/rest/v1/streams?id=eq.${editingId}` : "/rest/v1/streams";
+      const response=await fetch(SUPABASE_URL+endpoint,{
+        method:editingId?"PATCH":"POST", headers:apiHeaders({Prefer:"return=representation"}), body:JSON.stringify(body)
+      });
+      await parseResponse(response); await loadStreams(true); setSync(false,"Synchronisé");
+    }
+    async function deleteStream(id) {
+      setSync(true,"Suppression…");
+      const response=await fetch(`${SUPABASE_URL}/rest/v1/streams?id=eq.${id}`,{method:"DELETE",headers:apiHeaders()});
+      await parseResponse(response); await loadStreams(true); setSync(false,"Synchronisé");
+    }
     function promptFor(s) {
       return [`Je travaille sur le workstream « ${s.title} ».`,`Owner : ${s.owner}.`,`Échéance : ${formatDate(s.dueDate)}.`,`Avancement actuel : ${s.progress} %.`,"",s.prompt || "Aide-moi à identifier les prochaines actions concrètes et à structurer un plan d’exécution.","","Commence par me poser uniquement les questions indispensables, puis propose les trois prochaines actions prioritaires."].join("\n");
     }
@@ -284,17 +436,71 @@
       if(edit) openModal(streams.find(s=>s.id===Number(edit.dataset.edit)));
       if(chat) openChat(Number(chat.dataset.chat));
     });
-    $("streamForm").onsubmit = e => {
+    $("streamForm").onsubmit = async e => {
       e.preventDefault();
-      const data={id:editingId||Date.now(),title:$("title").value.trim(),owner:$("owner").value.trim(),dueDate:$("dueDate").value,progress:Number($("progress").value),prompt:$("prompt").value.trim()};
-      streams = editingId ? streams.map(s=>s.id===editingId?data:s) : [...streams,data];
-      save(); closeModal();
+      const data={title:$("title").value.trim(),owner:$("owner").value.trim(),dueDate:$("dueDate").value,progress:Number($("progress").value),prompt:$("prompt").value.trim()};
+      const submit=e.submitter; if(submit) submit.disabled=true;
+      try { await saveStream(data); closeModal(); notify("Stream enregistré et synchronisé."); }
+      catch(error) { notify(error.message,true); setSync(true,"Erreur de synchronisation"); }
+      finally { if(submit) submit.disabled=false; }
     };
-    $("deleteButton").onclick = () => {
+    $("deleteButton").onclick = async () => {
       const s=streams.find(x=>x.id===editingId);
-      if(s && confirm(`Supprimer « ${s.title} » ?`)){ streams=streams.filter(x=>x.id!==editingId); save(); closeModal(); }
+      if(s && confirm(`Supprimer « ${s.title} » ?`)){
+        try { await deleteStream(editingId); closeModal(); notify("Stream supprimé."); }
+        catch(error) { notify(error.message,true); setSync(true,"Erreur de synchronisation"); }
+      }
     };
-    render();
+    $("authSwitch").onclick=()=>{
+      signupMode=!signupMode;
+      $("authKicker").textContent=signupMode?"CRÉATION DE VOTRE ACCÈS":"CONNEXION SÉCURISÉE";
+      $("authTitle").textContent=signupMode?"Créez votre espace.":"Retrouvez vos streams.";
+      $("authIntro").textContent=signupMode?"Choisissez vos identifiants. Vous pourrez ensuite les utiliser sur tous vos appareils.":"Connectez-vous avec la même adresse sur tous vos appareils pour synchroniser automatiquement vos données.";
+      $("authSubmit").textContent=signupMode?"Créer mon accès":"Se connecter";
+      $("authSwitch").textContent=signupMode?"J’ai déjà un accès — me connecter":"Première visite ? Créer mon accès";
+      $("authPassword").autocomplete=signupMode?"new-password":"current-password";
+      $("authMessage").textContent="";
+    };
+    $("authForm").onsubmit=async e=>{
+      e.preventDefault();
+      const email=$("authEmail").value.trim(), password=$("authPassword").value;
+      $("authSubmit").disabled=true; $("authMessage").className="auth-message"; $("authMessage").textContent="Connexion en cours…";
+      try {
+        const redirect=encodeURIComponent(location.origin+location.pathname);
+        const path=signupMode?`/auth/v1/signup?redirect_to=${redirect}`:"/auth/v1/token?grant_type=password";
+        const response=await fetch(SUPABASE_URL+path,{method:"POST",headers:{apikey:SUPABASE_KEY,"Content-Type":"application/json"},body:JSON.stringify({email,password})});
+        const data=await parseResponse(response);
+        if (!data?.access_token) {
+          $("authMessage").textContent="Compte créé. Ouvrez l’e-mail de confirmation, puis revenez vous connecter ici.";
+        } else {
+          storeSession(data); await showApp();
+        }
+      } catch(error) {
+        $("authMessage").className="auth-message error";
+        $("authMessage").textContent=error.message==="Invalid login credentials"?"Adresse ou mot de passe incorrect.":error.message;
+      } finally { $("authSubmit").disabled=false; }
+    };
+    $("signoutButton").onclick=async()=>{
+      try { if(session) await fetch(`${SUPABASE_URL}/auth/v1/logout`,{method:"POST",headers:apiHeaders()}); } catch {}
+      clearSession(); $("authWrap").hidden=false; $("accountEmail").textContent=""; $("authMessage").textContent="";
+    };
+    async function showApp() {
+      $("authWrap").hidden=true;
+      $("accountEmail").textContent=session?.user?.email || $("authEmail").value;
+      await loadStreams();
+      clearInterval(syncTimer); syncTimer=setInterval(()=>loadStreams(true),12000);
+    }
+    async function start() {
+      render();
+      try {
+        captureSessionFromLink();
+        if(await ensureSession()) await showApp();
+        else $("authWrap").hidden=false;
+      } catch {
+        clearSession(); $("authWrap").hidden=false;
+      }
+    }
+    start();
   </script>
 </body>
 </html>
